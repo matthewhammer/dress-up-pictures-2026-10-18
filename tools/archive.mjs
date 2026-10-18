@@ -121,9 +121,9 @@ for (let i = 0; i < plan.length; i += 20) {
       c.setAttribute("xmlns", "http://www.w3.org/2000/svg"); c.setAttribute("x", 0); c.setAttribute("y", 0); c.setAttribute("width", pr.width.toFixed(1)); c.setAttribute("height", pr.height.toFixed(1));
       c.removeAttribute("style"); c.removeAttribute("class"); c.removeAttribute("id");
       const w = 1920, hh = Math.round(1920 * pr.height / pr.width);
-      return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hh + '" viewBox="0 0 ' + pr.width.toFixed(1) + " " + pr.height.toFixed(1) + '">' +
+      return '<?xml version="1.0" encoding="UTF-8"?>\\n<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hh + '" viewBox="0 0 ' + pr.width.toFixed(1) + " " + pr.height.toFixed(1) + '">' +
         new XMLSerializer().serializeToString(c) + overlayParts().svgs.join("") + "</svg>"; };
-    const overlaySnap = async svg => { const m = /width="(\d+)" height="(\d+)"/.exec(svg.slice(0, 400)), w = +m[1], hh = +m[2];
+    const overlaySnap = async svg => { const m = /width="(\\d+)" height="(\\d+)"/.exec(svg.slice(0, 400)), w = +m[1], hh = +m[2];
       const img = new Image(); img.src = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })); await img.decode();
       const cv = document.createElement("canvas"); cv.width = w; cv.height = hh; cv.getContext("2d").drawImage(img, 0, 0); return cv.toDataURL("image/png").split(",")[1]; };
     // (a still picture's markup: what an option draws is judged without the animations, which a
