@@ -38,7 +38,7 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 1000, de
 await send("Page.navigate", { url: "about:blank" }); await sleep(300);
 await send("Page.navigate", { url }); await sleep(4000);
 // 1. the list of pictures to take, from the page's own menus
-const plan = (await send("Runtime.evaluate", { returnByValue: true, expression: `(() => {
+let plan = (await send("Runtime.evaluate", { returnByValue: true, expression: `(() => {
   const slug = s => s.replace(/[^A-Za-z0-9]+/g, " ").trim().toLowerCase().replace(/ +/g, "-");
   const txt = (t, b) => typeof t === "function" ? t(b) : t;
   const shots = [];
@@ -52,6 +52,7 @@ const plan = (await send("Runtime.evaluate", { returnByValue: true, expression: 
     const [kind, key, label] = row;
     if (kind === "group") { walk(row[3], part, folder, tabLabel, label); continue; }
     if (part === "music" || part === "visible") continue;
+    if (typeof key !== "string") continue;   // (a row that is not a menu: a note, a world grid, a set of chips)
     // (a menu repeated per castle, room, cat or horse: only castle N's, the first one's)
     if (/[MD]$/.test(key) && /^castle/.test(key) || (key.match(/[0-9]+/g) || []).some(d => +d >= 2)) continue;
     const opts = kind === "choice" ? row[3].map(o => [o[0], txt(o[1], DEFAULTS[part])]) : kind === "toggle" ? [[true, "on"], [false, "off"]] : kind === "flip" ? [[true, row[2][1]], [false, row[2][0]]] : null;
@@ -65,7 +66,9 @@ const plan = (await send("Runtime.evaluate", { returnByValue: true, expression: 
     walk(rows, part, folder, tabLabel, null);
   }
   return shots;
-})()` })).result.result.value;
+})()` })).result;
+if (!plan || plan.exceptionDetails || !Array.isArray(plan.result.value)) { console.log("the plan failed:", JSON.stringify(plan && (plan.exceptionDetails || plan.result)).slice(0, 1500)); process.exit(1); }
+plan = plan.result.value;
 // (moves: the places with a ladder, the friend there at the defaults; each
 // climbed at three heights. A game without climbs by hand has none.)
 const ladderPlaces = (await send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `(async () => {
