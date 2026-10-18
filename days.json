@@ -1,18 +1,28 @@
 [
  {
+  "day": "2026/10/17/22-28",
+  "when": "Sat, Oct 17, 2026, 10:41 PM MDT",
+  "version": "0.0.197",
+  "commit": "6671ad6cc200d8ae977451fb7b634d7d1dbed257",
+  "made_at": "2026-10-17T22:41:41-06:00"
+ },
+ {
   "day": "2026/10/17",
+  "when": "Sat, Oct 17, 2026, 12:02 AM MDT",
   "version": "0.0.94",
   "commit": "78428f7450f42123a1ef2f7234993afdfa2c4b9e",
   "made_at": "2026-10-17T00:02:06-06:00"
  },
  {
   "day": "2026/10/16",
+  "when": "Fri, Oct 16, 2026, 6:06 PM MDT",
   "version": "0.0.90",
   "commit": "9958ca2717924c1431a38f94cd9ebba3faa98411",
   "made_at": "2026-10-16T18:06:22-06:00"
  },
  {
   "day": "2026/10/15",
+  "when": "Thu, Oct 15, 2026, 8:44 PM MDT",
   "version": "0.0.55",
   "commit": "b237b6dc6fb7bc16e0736491131923727989a2a7",
   "made_at": "2026-10-15T20:44:53-06:00"
