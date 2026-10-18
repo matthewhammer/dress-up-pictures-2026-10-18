@@ -13,7 +13,10 @@ WHAT=${1:-both}; PUSH=${2:-}
 PORT=${PORT:-9333}
 GAME=~/kids-choice-games; PICS=~/dress-up-pictures; MUSIC=~/dress-up-music
 # (each archive's own tools, in its repository: the copies there are the real ones)
+# (Dress Up ticket 262) the day in Matthew's time (Mountain); a later run the same day is its own folder in the day's, HH-MM
+export TZ=America/Denver
 DAY=$(date +%Y/%m/%d)
+[ -f "$PICS/$DAY/manifest.json" ] && DAY="$DAY/$(date +%H-%M)"
 # (the game as a folder since 2026-10-17, ticket 178: index.html, style.css and js/; copied whole, so the
 # archive draws what was there when it started, whatever is edited meanwhile)
 rm -rf ~/du-shots/work && mkdir -p ~/du-shots/work && cp -r "$GAME/dress-up/." ~/du-shots/work/

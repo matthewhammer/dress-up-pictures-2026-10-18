@@ -13,7 +13,14 @@
 // A file the same, byte for byte, as the same file on the latest earlier day
 // in the archive is a relative symlink to that day's (real) file, so a day
 // costs only what changed; the day's page links to the real file itself.
-//   node archive.mjs <devtools port> <page url> <out dir: <archive>/YYYY/MM/DD> [music archive url]
+// (Dress Up ticket 262, Matthew: "do the pictures in each scene, with and without 'what its made of' on. And with and
+// without collision boxes on. So 3x the pictures in total") Each background, with and without the friend, twice more:
+// with 🔬 🧩 what it is made of, and with 🔬 🧱 the collision boxes (folders <folder>-made-of, <folder>-collision-boxes):
+// the picture with the game's own overlay drawn over it, its look (colours, lines) as the page's stylesheet gives it.
+// ("use a localized timestamp ... in case we did that already today (and in general, for multiple runs per day)") A
+// day's first run is its folder, YYYY/MM/DD; a later run that day is YYYY/MM/DD/HH-MM, in Matthew's time (Mountain);
+// the run before is whichever is latest, a day or a run within one.
+//   node archive.mjs <devtools port> <page url> <out dir: <archive>/YYYY/MM/DD[/HH-MM]> [music archive url]
 import { writeFileSync, mkdirSync, rmSync, renameSync, existsSync, readFileSync, readdirSync, symlinkSync, realpathSync, unlinkSync } from "node:fs";
 import { join, relative, dirname } from "node:path";
 const [dport, url, finalDir, musicUrl] = process.argv.slice(2), outDir = finalDir + ".new";
@@ -73,6 +80,10 @@ const ladderPlaces = (await send("Runtime.evaluate", { awaitPromise: true, retur
 })()` })).result.result.value || [];
 for (const s of ladderPlaces) for (const [at, word] of [[0.25, "low"], [0.5, "halfway"], [0.8, "near the top"]])
   plan.push({ folder: "moves", name: `climb--${s.name}--${Math.round(at * 100)}`, label: `${s.label}: 🧗 climbing its ladder, ${word}`, bg: s.bg, friend: true, move: { at } });
+// (ticket 262) each background twice more, with an overlay of 🔬's on
+const OVERLAYS = [["made", "made-of", "🔬 🧩 what it is made of"], ["boxes", "collision-boxes", "🔬 🧱 collision boxes"]];
+for (const s of plan.filter(s => s.folder === "backgrounds" || s.folder === "backgrounds-with-friend"))
+  for (const [overlay, suffix, word] of OVERLAYS) plan.push({ ...s, folder: s.folder + "-" + suffix, label: s.label + ": " + word, overlay });
 console.log(plan.length, "pictures planned,", ladderPlaces.length, "places with a ladder");
 // 2. take them, a batch at a time
 const out = [];
@@ -91,6 +102,29 @@ for (let i = 0; i < plan.length; i += 20) {
       c.setAttribute("xmlns", "http://www.w3.org/2000/svg"); c.setAttribute("width", w); c.setAttribute("height", hh); c.removeAttribute("style"); c.removeAttribute("class");
       for (const a of c.querySelectorAll("animate,animateTransform,animateMotion")) a.remove();
       const img = new Image(); img.src = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(c)], { type: "image/svg+xml" })); await img.decode();
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = hh; cv.getContext("2d").drawImage(img, 0, 0); return cv.toDataURL("image/png").split(",")[1]; };
+    // (ticket 262: the picture with 🔬's overlay over it: #access-layer's drawings, each with its look from the page's
+    // stylesheet written into it, over the picture at its size on the screen; 1920 wide)
+    const LOOK = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-dasharray", "stroke-linecap", "stroke-linejoin",
+                  "opacity", "font-family", "font-size", "font-weight", "paint-order", "display", "visibility", "text-anchor", "dominant-baseline"];
+    const overlayParts = () => { const L = document.getElementById("access-layer"), pr = pic.getBoundingClientRect(), outp = [];
+      for (const o of L.querySelectorAll(":scope > svg")) { const r = o.getBoundingClientRect(), c = o.cloneNode(true);
+        const a = [o, ...o.querySelectorAll("*")], b = [c, ...c.querySelectorAll("*")];
+        a.forEach((el, i) => { const cs = getComputedStyle(el); b[i].setAttribute("style", LOOK.map(p => p + ":" + cs.getPropertyValue(p)).join(";")); b[i].removeAttribute("class"); });
+        for (const x of c.querySelectorAll("animate,animateTransform,animateMotion,set")) x.remove();
+        c.setAttribute("x", (r.left - pr.left).toFixed(1)); c.setAttribute("y", (r.top - pr.top).toFixed(1)); c.setAttribute("width", r.width.toFixed(1)); c.setAttribute("height", r.height.toFixed(1));
+        if (!c.getAttribute("viewBox")) c.setAttribute("viewBox", "0 0 " + r.width.toFixed(1) + " " + r.height.toFixed(1));
+        c.style.overflow = "hidden"; outp.push(new XMLSerializer().serializeToString(c)); }
+      const leg = L.querySelector(".made-legend"); return { svgs: outp, legend: leg ? leg.textContent : "" }; };
+    const overlaySvg = () => { const pr = pic.getBoundingClientRect(), c = pic.cloneNode(true);
+      for (const a of c.querySelectorAll("animate,animateTransform,animateMotion")) a.remove();
+      c.setAttribute("xmlns", "http://www.w3.org/2000/svg"); c.setAttribute("x", 0); c.setAttribute("y", 0); c.setAttribute("width", pr.width.toFixed(1)); c.setAttribute("height", pr.height.toFixed(1));
+      c.removeAttribute("style"); c.removeAttribute("class"); c.removeAttribute("id");
+      const w = 1920, hh = Math.round(1920 * pr.height / pr.width);
+      return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hh + '" viewBox="0 0 ' + pr.width.toFixed(1) + " " + pr.height.toFixed(1) + '">' +
+        new XMLSerializer().serializeToString(c) + overlayParts().svgs.join("") + "</svg>"; };
+    const overlaySnap = async svg => { const m = /width="(\d+)" height="(\d+)"/.exec(svg.slice(0, 400)), w = +m[1], hh = +m[2];
+      const img = new Image(); img.src = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })); await img.decode();
       const cv = document.createElement("canvas"); cv.width = w; cv.height = hh; cv.getContext("2d").drawImage(img, 0, 0); return cv.toDataURL("image/png").split(",")[1]; };
     // (a still picture's markup: what an option draws is judged without the animations, which a
     // still cannot show, so an LFO's or a blink's choice draws nothing different)
@@ -123,6 +157,18 @@ for (let i = 0; i < plan.length; i += 20) {
       return null; };
     for (const s of ${JSON.stringify(batch)}) {
       reset();
+      // (ticket 262: a background with an overlay of 🔬's on)
+      if (s.overlay) {
+        Object.assign(state.background, s.bg); for (const g of VISIBLE_PARTS) state.visible[g] = s.friend ? 100 : 0;
+        Object.assign(state.access, s.overlay === "made" ? { showMadeOf: true } : { showSolids: true });
+        changed(); await tick(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        madeShown = ""; solidsShown = ""; madeOfHud(); solidsHud(); await tick();
+        const svg = overlaySvg(), ov = overlayParts();
+        res.push({ ...s, label: s.label + (ov.legend ? " (" + ov.legend + ")" : ""), hash: h(markup() + "|" + s.overlay + "|" + ov.svgs.join("")), baseHash: null, same: false,
+                   png: await overlaySnap(svg), svg, settings: JSON.stringify({ app: "dress-up", version: 1, saved: new Date().toISOString(), state }, null, 2) });
+        reset(); changed();
+        continue;
+      }
       // (a move: up the ladder nearest where the friend stands, by hand to its height)
       if (s.move) {
         Object.assign(state.background, s.bg); for (const g of VISIBLE_PARTS) state.visible[g] = 100;
@@ -180,11 +226,15 @@ for (let i = 0; i < plan.length; i += 20) {
 }
 // 3. files, a manifest, an index
 // (the latest earlier day in the archive, to link unchanged files to)
-const root = join(finalDir, "..", "..", ".."), day = relative(root, finalDir);
+// (the archive's root: above YYYY/MM/DD, and HH-MM when this is a later run that day)
+const root = join(finalDir, ...Array(/[\/][0-9]{2}-[0-9]{2}\/?$/.test(finalDir) ? 4 : 3).fill("..")), day = relative(root, finalDir);
 let lastDay = null;
+const runOk = k => existsSync(join(root, k, "manifest.json"));
 for (const y of readdirSync(root).filter(d => /^[0-9]{4}$/.test(d)))
   for (const m of readdirSync(join(root, y)).filter(d => /^[0-9]{2}$/.test(d)))
-    for (const d of readdirSync(join(root, y, m)).filter(d => /^[0-9]{2}$/.test(d))) { const k = `${y}/${m}/${d}`; if (k < day && (!lastDay || k > lastDay)) lastDay = k; }
+    for (const d of readdirSync(join(root, y, m)).filter(d => /^[0-9]{2}$/.test(d)))
+      for (const k of [`${y}/${m}/${d}`, ...readdirSync(join(root, y, m, d)).filter(t => /^[0-9]{2}-[0-9]{2}$/.test(t)).map(t => `${y}/${m}/${d}/${t}`)])
+        if (k < day && runOk(k) && (!lastDay || k > lastDay)) lastDay = k;
 const linked = new Map();   // (a file of today's -> the path, from today's folder, of the real file it links to)
 const put = (rel, data) => {
   const prev = lastDay && join(root, lastDay, rel);
@@ -195,6 +245,8 @@ const put = (rel, data) => {
   } else writeFileSync(join(outDir, rel), data);
 };
 const href = rel => linked.get(rel) || rel;
+// (a linked file's run: its day, and its HH-MM within the day when it has one; the path is from this run's folder)
+const runOf = rel => { const parts = relative(root, join(finalDir, rel)).split("/"); return parts.slice(0, /^[0-9]{2}-[0-9]{2}$/.test(parts[3]) ? 4 : 3).join("/"); };
 const manifest = [], firstOf = new Map();
 for (const s of out) {
   let file = null, sameAs = null;
@@ -206,7 +258,7 @@ for (const s of out) {
   manifest.push({ folder: s.folder, name: s.name, label: s.label, tab: s.tab || null, key: s.key || null, value: s.value ?? null, hash: s.hash, sameAsDefault: s.same, onlyWithOtherSettings: !!s.hidden,
                   sameAsFile: s.same ? firstOf.get(s.baseHash) || null : null,
                   png: file, svg: file && file.replace(/\.png$/, ".svg"), settings: file && file.replace(/\.png$/, ".json"), sameDrawingAs: sameAs,
-                  unchangedSince: file && linked.has(file) ? linked.get(file).split("/").slice(0, 3).join("/") : null });
+                  unchangedSince: file && linked.has(file) ? runOf(linked.get(file)) : null });
 }
 writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 1));
 const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -217,6 +269,8 @@ writeFileSync(`${outDir}/index.html`, `<!doctype html><meta charset="utf-8"><tit
 figure{margin:0;width:240px} img{width:240px;border:1px solid #ccc;background:#fff} figcaption{font-size:12px} figure.dflt img{border:3px solid #c9a227}
 ul.rest{font-size:13px;color:#555;margin:8px 0 0;padding-left:20px} ul.rest li{margin:2px 0} h3{font-size:14px;margin:12px 0 0;color:#555}</style>
 <h1>Messed Up Dress Up: every picture at its defaults</h1>
+<p>Made ${esc(new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", dateStyle: "full", timeStyle: "short" }).format(new Date()))}, Mountain time${/[0-9]{2}-[0-9]{2}$/.test(day) ? " (a later run that day: <a href=\"../index.html\">the day's first</a>)" : ""}.
+Each place three ways: as it is, with 🔬 🧩 what it is made of, and with 🔬 🧱 the collision boxes.</p>
 <p>${manifest.filter(m => m.png && !m.sameDrawingAs).length} distinct drawings, each a 1920-wide PNG, an SVG and its settings (the game's save format: Load opens it).
 Each section opens with its default picture (gold frame). A menu hidden under the defaults is shown "with" the setting that brings it out.
 Under each section's pictures: the options that draw nothing different, each with the picture it equals, and the menus that show only once other settings are chosen.</p>` +
